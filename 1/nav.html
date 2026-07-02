@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+    <title>奶酪导航 · 前后端分离管理后台</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            background: #f0f4f9;
+            font-family: system-ui, -apple-system, 'Segoe UI', Roboto, 'PingFang SC', sans-serif;
+            padding: 24px 20px 60px;
+            color: #0f172a;
+        }
+        .admin-container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+        .top-header {
+            background: white;
+            border-radius: 48px;
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            flex-wrap: wrap;
+            gap: 16px;
+            margin-bottom: 28px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.02);
+            border: 1px solid #e2edf7;
+        }
+        h1 {
+            font-size: 1.6rem;
+            background: linear-gradient(135deg, #1e466e, #2b6a8f);
+            background-clip: text;
+            -webkit-background-clip: text;
+            color: transparent;
+        }
+        .api-badge {
+            background: #eef2ff;
+            padding: 4px 16px;
+            border-radius: 40px;
+            font-size: 0.75rem;
+            font-family: monospace;
+        }
+        .btn-group {
+            display: flex;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        button {
+            background: white;
+            border: 1px solid #cbd5e1;
+            padding: 8px 20px;
+            border-radius: 60px;
+            font-weight: 500;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: 0.2s;
+            color: #1e466e;
+        }
+        button.primary {
+            background: #1e466e;
+            border-color: #1e466e;
+            color: white;
+        }
+        button.primary:hover {
+            background: #0f3557;
+            transform: translateY(-1px);
+        }
+        button.danger {
+            border-color: #fecaca;
+            color: #b91c1c;
+        }
+        button.danger:hover {
+            background: #fee2e2;
+        }
+        button.outline {
+            border: 1px solid #cbd5e1;
+        }
+        .dashboard {
+            display: flex;
+            gap: 28px;
+            flex-wrap: wrap;
+        }
+        .cat-sidebar {
+            flex: 1.2;
+            min-width: 280px;
+            background: white;
+            border-radius: 32px;
+            border: 1px solid #eef2fa;
+            padding: 20px 0;
+            height: fit-content;
+            position: sticky;
+            top: 20px;
+        }
+        .bookmark-main {
+            flex: 3;
+            min-width: 320px;
+            background: white;
+            border-radius: 32px;
+            border: 1px solid #eef2fa;
+            padding: 24px 28px;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0 20px 12px 20px;
+            border-bottom: 2px solid #eef2ff;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .cat-tree {
+            max-height: 70vh;
+            overflow-y: auto;
+            padding: 0 12px;
+        }
+        .cat-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 10px 14px;
+            margin: 4px 0;
+            border-radius: 60px;
+            cursor: pointer;
+            transition: all 0.12s;
+            background: #ffffff;
+        }
+        .cat-item.active {
+            background: #eef2ff;
+            font-weight: 500;
+            color: #1e466e;
+            border: 1px solid #cbdffc;
+        }
+        .cat-name {
+            flex: 1;
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+        .cat-actions {
+            display: flex;
+            gap: 6px;
+            opacity: 0.6;
+        }
+        .cat-item:hover .cat-actions {
+            opacity: 1;
+        }
+        .bookmark-table {
+            width: 100%;
+            border-collapse: collapse;
+        }
+        .bookmark-table th, .bookmark-table td {
+            padding: 12px 8px;
+            text-align: left;
+            border-bottom: 1px solid #edf2f7;
+        }
+        .bookmark-url {
+            font-size: 0.78rem;
+            color: #5b6e8c;
+            max-width: 260px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .action-icons {
+            display: flex;
+            gap: 12px;
+            font-size: 1.1rem;
+        }
+        .action-icons span {
+            cursor: pointer;
+            opacity: 0.7;
+        }
+        .action-icons span:hover {
+            opacity: 1;
+        }
+        .empty-placeholder {
+            text-align: center;
+            padding: 56px 20px;
+            color: #94a3b8;
+        }
+        .modal-mask {
+            position: fixed;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(5px);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 3000;
+            visibility: hidden;
+            opacity: 0;
+            transition: 0.2s;
+        }
+        .modal-mask.show {
+            visibility: visible;
+            opacity: 1;
+        }
+        .modal-container {
+            background: white;
+            width: 90%;
+            max-width: 520px;
+            border-radius: 44px;
+            padding: 28px;
+        }
+        .modal-container input, .modal-container select {
+            width: 100%;
+            padding: 12px 16px;
+            margin: 12px 0 20px;
+            border: 1px solid #cbd5e1;
+            border-radius: 60px;
+        }
+        .modal-buttons {
+            display: flex;
+            justify-content: flex-end;
+            gap: 12px;
+            margin-top: 20px;
+        }
+        .toast-msg {
+            position: fixed;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #1e293b;
+            color: white;
+            padding: 8px 24px;
+            border-radius: 60px;
+            font-size: 0.85rem;
+            z-index: 3100;
+            opacity: 0;
+            transition: 0.2s;
+            pointer-events: none;
+        }
+        .toast-msg.show {
+            opacity: 1;
+        }
+        @media (max-width: 780px) {
+            .cat-sidebar { position: static; }
+        }
+    </style>
+</head>
+<body>
+<div class="admin-container">
+    <div class="top-header">
+        <div style="display: flex; align-items: center; gap: 16px;">
+            <h1>🧀 奶酪导航 · 前后端分离</h1>
+            <div class="api-badge" id="apiStatus">⚙️ API: 模拟后端 (JSON Server)</div>
+        </div>
+        <div class="btn-group">
+            <button id="exportJsonBtn" class="outline">📤 导出JSON配置</button>
+            <button id="resetMockBtn" class="danger">🔄 重置Mock数据</button>
+            <button id="previewNavBtn" class="primary">🌐 预览前端导航</button>
+        </div>
+    </div>
+
+    <div class="dashboard">
+        <div class="cat-sidebar">
+            <div class="section-header">
+                <h3>📂 分类管理</h3>
+                <button id="addRootCatBtn" class="primary" style="padding:4px 16px;">+ 新建</button>
+            </div>
+            <div id="categoryTreeArea" class="cat-tree">
+                <div style="padding:20px; text-align:center;">加载中...</div>
+            </div>
+            <div style="padding: 12px 20px; font-size:12px; color:#6c86a3; border-top:1px solid #edf2f7;">
+                💡 支持无限级分类，删除前需清空子分类/书签
+            </div>
+        </div>
+
+        <div class="bookmark-main">
+            <div class="section-header">
+                <h3 id="currentCatTitle">🔖 书签列表</h3>
+                <button id="addBookmarkBtn" class="primary">+ 添加书签</button>
+            </div>
+            <div id="bookmarksContainer">
+                <div class="empty-placeholder">✨ 请从左侧选择一个分类</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div id="globalModal" class="modal-mask">
+    <div class="modal-container">
+        <h2 id="modalTitle">表单</h2>
+        <div id="modalFormBody"></div>
+        <div class="modal-buttons">
+            <button id="modalCancelBtn">取消</button>
+            <button id="modalConfirmBtn" class="primary">确认</button>
+        </div>
+    </div>
+</div>
+<div id="globalToast" class="toast-msg">提示</div>
+
+<!-- 引入独立的 API 服务模块 (前后端分离核心) -->
+<script src="api-service.js"></script>
+<script>
+    // ======================= 前端UI逻辑 (完全依赖 api-service.js) =======================
+    // 当前选中的分类ID
+    let currentSelectedCategoryId = null;
+    let allCategories = [];
+
+    // 显示提示消息
+    function showToast(msg, duration = 1600) {
+        const toast = document.getElementById('globalToast');
+        toast.innerText = msg;
+        toast.classList.add('show');
+        setTimeout(() => toast.classList.remove('show'), duration);
+    }
+
+    // 辅助HTML转义
+    function escapeHtml(str) {
+        if (!str) return '';
+        return str.replace(/[&<>]/g, function(m) {
+            if (m === '&') return '&amp;';
+            if (m === '<') return '&lt;';
+            if (m === '>') return '&gt;';
+            return m;
+        });
+    }
+
+    // 构建分类树 (前端辅助)
+    function buildCategoryTree(cats) {
+        const map = new Map();
+        cats.forEach(c => { map.set(c.id, { ...c, children: [] }); });
+        const roots = [];
+        cats.forEach(c => {
+            const node = map.get(c.id);
+            if (c.parentId === null || !map.has(c.parentId)) roots.push(node);
+            else {
+                const parent = map.get(c.parentId);
+                if (parent) parent.children.push(node);
+            }
+        });
+        const sortByOrder = (arr) => {
+            arr.sort((a, b) => (a.order || 0) - (b.order || 0));
+            arr.forEach(n => { if (n.children.length) sortByOrder(n.children); });
+        };
+        sortByOrder(roots);
+        return roots;
+    }
+
+    // 刷新所有数据 (重新获取分类和书签)
+    async function refreshAllData() {
+        try {
+            allCategories = await API.getCategories();
+            await renderCategoryTree();
+            await renderBookmarksByCategory();
+        } catch (err) {
+            console.error(err);
+            showToast('数据加载失败: ' + err.message);
+        }
+    }
+
+    // 渲染分类树 (使用API获取最新分类)
+    async function renderCategoryTree() {
+        const container = document.getElementById('categoryTreeArea');
+        if (!container) return;
+        
+        // 重新获取分类确保最新
+        allCategories = await API.getCategories();
+        const tree = buildCategoryTree(allCategories);
+        
+        function renderTree(nodes, level = 0) {
+            let html = `<ul style="list-style:none; padding-left: ${level * 16}px;">`;
+            for (let node of nodes) {
+                const activeClass = (currentSelectedCategoryId === node.id) ? 'active' : '';
+                // 获取子分类数量
+                const childCount = allCategories.filter(c => c.parentId === node.id).length;
+                // 获取该分类下的书签数量（需要实时获取，但为了性能先全局bookmarks? 通过API单独获取每个分类数量开销大，这里用全局变量会在后续更新）
+                // 但刷新时bookmark数据会被重新拉取，我们可以在每次渲染分类时从内存获取书签数
+                let bookmarkCount = 0;
+                // 异步获取所有书签？性能较差，在renderBookmarks里已经刷新，这里先简单从内存获取，我们在refreshAllData后会重新渲染
+                // 这里先展示0, 实际会在refreshAll后调用renderCategoryTree时已经通过API.bookmarks缓存? 为了展示数量需要额外处理，增加一个全局bookmarks缓存
+                if (window._globalBookmarksCache) {
+                    bookmarkCount = window._globalBookmarksCache.filter(b => b.categoryId === node.id).length;
+                }
+                html += `
+                    <li style="margin-bottom: 6px;">
+                        <div class="cat-item ${activeClass}" data-cat-id="${node.id}">
+                            <div class="cat-name">
+                                <span>${node.icon || '📂'}</span>
+                                <span>${escapeHtml(node.name)}</span>
+                                <span style="font-size:11px; background:#eef2ff; padding:2px 8px; border-radius:20px;">${bookmarkCount}</span>
+                            </div>
+                            <div class="cat-actions">
+                                <button class="edit-cat" data-id="${node.id}" data-name="${escapeHtml(node.name)}" data-parent="${node.parentId ?? ''}">编辑</button>
+                                <button class="add-sub" data-parent="${node.id}">子分类</button>
+                                <button class="del-cat" data-id="${node.id}" ${childCount > 0 ? 'disabled style="opacity:0.4;"' : ''}>删除</button>
+                            </div>
+                        </div>
+                        ${node.children.length ? renderTree(node.children, level + 1) : ''}
+                    </li>
+                `;
+            }
+            html += `</ul>`;
+            return html;
+        }
+        container.innerHTML = renderTree(tree);
+        
+        // 绑定分类点击事件
+        document.querySelectorAll('.cat-item').forEach(el => {
+            el.addEventListener('click', (e) => {
+                if (e.target.closest('.cat-actions')) return;
+                const cid = parseInt(el.dataset.catId);
+                if (!isNaN(cid)) {
+                    currentSelectedCategoryId = cid;
+                    renderCategoryTree();      // 重新渲染高亮
+                    renderBookmarksByCategory();
+                }
+            });
+        });
+        
+        // 编辑分类
+        document.querySelectorAll('.edit-cat').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const id = parseInt(btn.dataset.id);
+                const name = btn.dataset.name;
+                const parent = btn.dataset.parent === 'null' ? null : parseInt(btn.dataset.parent);
+                openCategoryModal(id, name, parent);
+            });
+        });
+        
+        // 添加子分类
+        document.querySelectorAll('.add-sub').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const parentId = parseInt(btn.dataset.parent);
+                openCategoryModal(null, null, parentId);
+            });
+        });
+        
+        // 删除分类
+        document.querySelectorAll('.del-cat').forEach(btn => {
+            btn.addEventListener('click', async (e) => {
+                e.stopPropagation();
+                const id = parseInt(btn.dataset.id);
+                try {
+                    await API.deleteCategory(id);
+                    if (currentSelectedCategoryId === id) {
+                        currentSelectedCategoryId = allCategories.length ? allCategories[0]?.id : null;
+                    }
+                    await refreshAllData();
+                    showToast('分类已删除');
+                } catch (err) {
+                    showToast(err.message, 1800);
+                }
+            });
+        });
+    }
+
+    // 渲染书签 (根据当前分类)
+    async function renderBookmarksByCategory() {
+        const container = document.getElementById('bookmarksContainer');
+        const titleSpan = document.getElementById('currentCatTitle');
+        if (!currentSelectedCategoryId) {
+            titleSpan.innerHTML = '🔖 书签列表';
+            container.innerHTML = '<div class="empty-placeholder">📌 请从左侧选择一个分类</div>';
+            return;
+        }
+        const cat = allCategories.find(c => c.id === currentSelectedCategoryId);
+        titleSpan.innerHTML = `🔖 ${cat ? escapeHtml(cat.name) : '分类'} · 书签管理`;
+        
+        try {
+            const bookmarks = await API.getBookmarksByCategory(currentSelectedCategoryId);
+            // 更新全局缓存用于分类数量显示
+            const allBms = await API.getAllBookmarks();
+            window._globalBookmarksCache = allBms;
+            
+            if (bookmarks.length === 0) {
+                container.innerHTML = '<div class="empty-placeholder">📭 暂无书签，点击右上角“添加书签”</div>';
+                return;
+            }
+            let html = `<table class="bookmark-table"><thead><tr><th>图标</th><th>标题</th><th>URL</th><th>操作</th></tr></thead><tbody>`;
+            bookmarks.forEach(b => {
+                html += `
+                    <tr>
+                        <td>${b.icon || '🔗'}</td>
+                        <td><strong>${escapeHtml(b.title)}</strong></td>
+                        <td class="bookmark-url" title="${escapeHtml(b.url)}">${escapeHtml(b.url.length > 70 ? b.url.substring(0,70)+'...' : b.url)}</td>
+                        <td class="action-icons">
+                            <span class="edit-bm" data-id="${b.id}" title="编辑">✏️</span>
+                            <span class="delete-bm" data-id="${b.id}" title="删除">🗑️</span>
+                        </td>
+                    </tr>
+                `;
+            });
+            html += `</tbody></table>`;
+            container.innerHTML = html;
+            
+            // 绑定编辑删除
+            document.querySelectorAll('.edit-bm').forEach(el => {
+                el.addEventListener('click', async () => {
+                    const id = parseInt(el.dataset.id);
+                    const bm = bookmarks.find(b => b.id === id);
+                    if (bm) openBookmarkModal(bm);
+                });
+            });
+            document.querySelectorAll('.delete-bm').forEach(el => {
+                el.addEventListener('click', async () => {
+                    const id = parseInt(el.dataset.id);
+                    if (confirm('确认删除该书签吗？')) {
+                        await API.deleteBookmark(id);
+                        await refreshAllData();
+                        showToast('书签已删除');
+                    }
+                });
+            });
+        } catch (err) {
+            container.innerHTML = '<div class="empty-placeholder">加载失败</div>';
+            showToast(err.message);
+        }
+    }
+
+    // 分类弹窗 (新增/编辑)
+    function openCategoryModal(catId = null, oldName = null, parentId = null) {
+        const isEdit = catId !== null;
+        const modal = document.getElementById('globalModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const formBody = document.getElementById('modalFormBody');
+        modalTitle.innerText = isEdit ? '编辑分类' : '新建分类';
+        
+        // 构建父级下拉选项
+        let options = '<option value="">无 (顶级分类)</option>';
+        const buildSelect = (nodes, level = 0) => {
+            for (let n of nodes) {
+                if (isEdit && n.id === catId) continue;
+                const selected = (!isEdit && parentId === n.id) || (isEdit && (parentId === n.id));
+                options += `<option value="${n.id}" ${selected ? 'selected' : ''}>${'--'.repeat(level)} ${escapeHtml(n.name)}</option>`;
+                if (n.children) buildSelect(n.children, level + 1);
+            }
+        };
+        const tree = buildCategoryTree(allCategories);
+        buildSelect(tree);
+        
+        formBody.innerHTML = `
+            <label>分类名称</label>
+            <input id="catNameInput" value="${isEdit ? escapeHtml(oldName) : ''}" placeholder="请输入分类名">
+            <label>上级分类</label>
+            <select id="catParentSelect">${options}</select>
+        `;
+        modal.classList.add('show');
+        
+        const submit = async () => {
+            const newName = document.getElementById('catNameInput').value.trim();
+            if (!newName) { showToast('名称不能为空'); return; }
+            const parentVal = document.getElementById('catParentSelect').value;
+            const newParent = parentVal ? parseInt(parentVal) : null;
+            try {
+                if (isEdit) {
+                    await API.updateCategory(catId, { name: newName, parentId: newParent });
+                    showToast('分类已更新');
+                } else {
+                    await API.createCategory({ name: newName, parentId: newParent, order: 0, icon: '📁' });
+                    showToast('分类已创建');
+                }
+                await refreshAllData();
+                modal.classList.remove('show');
+            } catch (err) {
+                showToast(err.message);
+            }
+        };
+        const cancel = () => modal.classList.remove('show');
+        document.getElementById('modalConfirmBtn').onclick = submit;
+        document.getElementById('modalCancelBtn').onclick = cancel;
+    }
+
+    // 书签弹窗 (新增/编辑)
+    function openBookmarkModal(bookmark = null) {
+        const isEdit = bookmark !== null;
+        const modal = document.getElementById('globalModal');
+        const modalTitle = document.getElementById('modalTitle');
+        const formBody = document.getElementById('modalFormBody');
+        modalTitle.innerText = isEdit ? '编辑书签' : '新建书签';
+        
+        let catOptions = '';
+        const buildCatOpts = (nodes, level = 0) => {
+            for (let n of nodes) {
+                const selected = (!isEdit && currentSelectedCategoryId === n.id) || (isEdit && bookmark.categoryId === n.id);
+                catOptions += `<option value="${n.id}" ${selected ? 'selected' : ''}>${'--'.repeat(level)} ${escapeHtml(n.name)}</option>`;
+                if (n.children) buildCatOpts(n.children, level + 1);
+            }
+        };
+        const tree = buildCategoryTree(allCategories);
+        buildCatOpts(tree);
+        
+        formBody.innerHTML = `
+            <label>标题</label>
+            <input id="bmTitle" value="${isEdit ? escapeHtml(bookmark.title) : ''}" placeholder="书签名称">
+            <label>URL</label>
+            <input id="bmUrl" value="${isEdit ? escapeHtml(bookmark.url) : ''}" placeholder="https:// 或 javascript:">
+            <label>图标(Emoji)</label>
+            <input id="bmIcon" value="${isEdit ? (bookmark.icon || '🔖') : '🔖'}">
+            <label>所属分类</label>
+            <select id="bmCatSelect">${catOptions}</select>
+        `;
+        modal.classList.add('show');
+        
+        const submit = async () => {
+            const title = document.getElementById('bmTitle').value.trim();
+            const url = document.getElementById('bmUrl').value.trim();
+            const icon = document.getElementById('bmIcon').value.trim() || '🔗';
+            const catId = parseInt(document.getElementById('bmCatSelect').value);
+            if (!title || !url) { showToast('标题和网址不能为空'); return; }
+            try {
+                if (isEdit) {
+                    await API.updateBookmark(bookmark.id, { title, url, icon, categoryId: catId });
+                    showToast('书签已更新');
+                } else {
+                    await API.createBookmark({ title, url, icon, categoryId: catId, order: 0 });
+                    showToast('书签已添加');
+                }
+                await refreshAllData();
+                modal.classList.remove('show');
+            } catch (err) {
+                showToast(err.message);
+            }
+        };
+        const cancel = () => modal.classList.remove('show');
+        document.getElementById('modalConfirmBtn').onclick = submit;
+        document.getElementById('modalCancelBtn').onclick = cancel;
+    }
+
+    // 导出JSON配置 (前后端分离下的配置导出)
+    async function exportConfig() {
+        try {
+            const cats = await API.getCategories();
+            const bms = await API.getAllBookmarks();
+            const exportData = { categories: cats, bookmarks: bms, exportTime: new Date().toISOString() };
+            const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = `cheese_nav_backend_sep_${Date.now()}.json`;
+            a.click();
+            URL.revokeObjectURL(a.href);
+            showToast('配置已导出');
+        } catch (err) {
+            showToast('导出失败');
+        }
+    }
+
+    // 重置Mock数据 (调用API重置)
+    async function resetMockData() {
+        if (confirm('重置将清除所有数据并恢复示例分类+书签，确定吗？')) {
+            try {
+                await API.resetToMockData();
+                await refreshAllData();
+                showToast('已重置为默认示例数据');
+            } catch (err) {
+                showToast('重置失败: ' + err.message);
+            }
+        }
+    }
+
+    // 预览前端导航（基于当前数据生成纯HTML）
+    async function previewFrontend() {
+        const cats = await API.getCategories();
+        const bms = await API.getAllBookmarks();
+        const tree = buildCategoryTree(cats);
+        let navHtml = `<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>奶酪导航·实时同步版</title><link rel="stylesheet" href="https://lib.baomitu.com/font-awesome/4.7.0/css/font-awesome.css"><style>body{background:#f6f9fc;font-family:system-ui;padding:20px;}ul{max-width:1300px;margin:0 auto;}a{text-decoration:none;color:#1e466e;}a:hover{color:#f39c12;}</style></head><body><div style="text-align:center;"><h2>🧀 动态导航 (前后端分离版)</h2><p>数据实时同步管理后台</p></div><ul>`;
+        function renderFront(nodes) {
+            let html = '';
+            for (let node of nodes) {
+                const childrenBms = bms.filter(b => b.categoryId === node.id);
+                html += `<li><i class="fa fa-folder fa-lg"></i><a>${escapeHtml(node.name)}</a><ul class="menu">`;
+                childrenBms.forEach(b => {
+                    html += `<li><i class="ie"></i><a href="${b.url}" target="play">${b.icon || '🔗'} ${escapeHtml(b.title)}</a></li>`;
+                });
+                if (node.children.length) html += renderFront(node.children);
+                html += `</ul></li>`;
+            }
+            return html;
+        }
+        navHtml += renderFront(tree);
+        navHtml += `<li><i class="ie"></i><a href="about:blank">空白页</a></li></ul><div style="text-align:center;margin-top:30px;">✨ 后台管理数据已同步 | 前后端分离架构</div></body></html>`;
+        const win = window.open();
+        win.document.write(navHtml);
+        win.document.close();
+    }
+
+    // 绑定UI事件
+    document.getElementById('addRootCatBtn').onclick = () => openCategoryModal(null, null, null);
+    document.getElementById('addBookmarkBtn').onclick = () => {
+        if (!currentSelectedCategoryId && allCategories.length) currentSelectedCategoryId = allCategories[0].id;
+        if (!currentSelectedCategoryId) { showToast('请先创建分类'); return; }
+        openBookmarkModal(null);
+    };
+    document.getElementById('exportJsonBtn').onclick = exportConfig;
+    document.getElementById('resetMockBtn').onclick = resetMockData;
+    document.getElementById('previewNavBtn').onclick = previewFrontend;
+
+    // 初始化加载数据
+    (async function init() {
+        try {
+            // 确保API模块已加载，并检查状态
+            if (typeof API === 'undefined') {
+                console.error('API模块未加载，请确保 api-service.js 已引入');
+                document.getElementById('categoryTreeArea').innerHTML = '<div style="padding:20px;color:red;">错误: api-service.js 未加载</div>';
+                return;
+            }
+            // 可选: 显示后端类型 (模拟)
+            const statusEl = document.getElementById('apiStatus');
+            if (statusEl) statusEl.innerHTML = '✅ API: 模拟后端 (RESTful)';
+            await refreshAllData();
+        } catch (err) {
+            console.error(err);
+            document.getElementById('categoryTreeArea').innerHTML = '<div style="padding:20px;color:red;">初始化失败，请检查网络或后端服务</div>';
+        }
+    })();
+</script>
+</body>
+</html>
