@@ -1,0 +1,220 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<title>Plyr HLS播放器</title>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<meta name="spm_prefix" content="457.19">
+<!-- 本地引入 -->
+<link href="./plyr/plyr.min.css" type="text/css" rel="stylesheet" />
+<script src="./plyr/hls.min.js"></script>
+<script src="./plyr/plyr.min.js" type="application/javascript"></script>
+<style>
+    * {
+        margin: 0;
+        border: 0;
+        padding: 0;
+        text-decoration: none;
+        box-sizing: border-box;
+    }
+    body, html {
+        width: 100%;
+        height: 100%;
+        padding: 0;
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+    }
+    #video-box {
+        width: 100%;
+        height: 100%;
+    }
+    video {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+    }
+    /* 深色模式变量修正 */
+    body.dark {
+        --plyr-color-main: #409eff;
+        --plyr-audio-controls-background: #374251;
+        --plyr-control-icon-color: #fff;
+        --plyr-control-text-color: #fff;
+        --plyr-border-color: #222;
+    }
+    .audiodiv {
+        border-radius: 5px;
+        overflow: hidden;
+        border: 1px solid var(--plyr-border-color,#eee);
+    }
+</style>
+</head>
+<body>
+<div id="video-box" class="audiodiv">
+    <video 
+        id="video-player" 
+        playsinline 
+        controls 
+        data-poster="./vbg.webp" 
+        data-plyr-config='{ "ratio": "16:9" }'>
+        <!-- 空source，JS动态赋值 -->
+        <source type="application/x-mpegURL" />
+    </video>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+    const video = document.getElementById('video-player');
+    const sourceDom = video.querySelector('source');
+    let hls = null;
+    // 默认兜底m3u8地址
+    const DEFAULT_M3U8 = 'https://v.lzcdn31.com/20260217/2672_989986af/index.m3u8';
+
+    // 1. 从URL读取 url 参数
+    function getUrlParam(paramName) {
+        const params = new URLSearchParams(window.location.search);
+        const val = params.get(paramName);
+        return val ? decodeURIComponent(val) : '';
+    }
+    let playUrl = getUrlParam('url') || DEFAULT_M3U8;
+
+    // 校验是否合法m3u8链接
+    if (!playUrl.endsWith('.m3u8')) {
+        alert('URL参数必须是m3u8视频地址，将使用默认视频播放');
+        playUrl = DEFAULT_M3U8;
+    }
+
+    // 完整中文本地化
+    const plyrLang = {
+        speed: '倍速',
+        normal: '正常',
+        playbackRates: '播放速度',
+        quality: '清晰度',
+        loop: '循环',
+        mute: '静音',
+        unmute: '取消静音',
+        volume: '音量',
+        captions: '字幕',
+        settings: '设置',
+        fullscreen: '全屏',
+        exitFullscreen: '退出全屏',
+        pip: '画中画'
+    };
+
+    // 初始化Plyr播放器
+    const player = new Plyr(video, {
+        i18n: plyrLang,
+        resetOnEnd: true,
+        keyboard: { focused: true, global: true },
+        tooltips: { controls: true, seek: true },
+        storage: { enabled: true, key: 'plyr' }
+    });
+    window.player = player;
+
+    // 销毁旧HLS实例
+    function destroyHls() {
+        if (hls) {
+            hls.destroy();
+            hls = null;
+        }
+        video.src = '';
+        sourceDom.src = '';
+    }
+
+    // 加载HLS视频
+    function loadVideo(url) {
+        destroyHls();
+        sourceDom.src = url;
+        if (Hls.isSupported()) {
+            hls = new Hls({
+                maxBufferLength: 30,
+                maxMaxBufferLength: 60
+            });
+            hls.loadSource(url);
+            hls.attachMedia(video);
+            window.hls = hls;
+
+            // 字幕同步
+            player.on('languagechange', () => {
+                setTimeout(() => {
+                    if (hls.subtitleTracks.length) {
+                        hls.subtitleTrack = player.currentTrack ?? -1;
+                    }
+                }, 50);
+            });
+
+            // HLS错误自动重试
+            hls.on(Hls.Events.ERROR, (event, data) => {
+                if (data.fatal) {
+                    switch(data.type) {
+                        case Hls.ErrorTypes.NETWORK_ERROR:
+                            hls.startLoad();
+                            break;
+                        case Hls.ErrorTypes.MEDIA_ERROR:
+                            hls.recoverMediaError();
+                            break;
+                        default:
+                            destroyHls();
+                            alert('视频加载失败，请检查m3u8地址或网络');
+                            break;
+                    }
+                }
+            });
+        } else if (video.canPlayType('application/x-mpegURL')) {
+            // Safari原生HLS
+            video.src = url;
+        } else {
+            alert('当前浏览器不支持HLS播放，请更换浏览器');
+        }
+    }
+
+    // 执行加载视频
+    loadVideo(playUrl);
+
+    // 页面卸载销毁HLS
+    window.addEventListener('beforeunload', destroyHls);
+});
+
+// ---------------- 深色模式广播逻辑不变 ----------------
+window.main = {};
+// 读取Cookie
+function getCookie(name) {
+    const arr = document.cookie.split('; ');
+    for(let i=0;i<arr.length;i++){
+        const item = arr[i].split('=');
+        if(item[0] === name) return item[1];
+    }
+    return null;
+}
+const darkCookie = getCookie('dark');
+if(darkCookie === 'dark') main.SwitchDarkMode(true);
+
+// 切换深色模式
+main.SwitchDarkMode = function(dark){
+    if(dark){
+        document.body.classList.add('dark');
+        document.cookie = 'dark=dark;path=/;max-age=2592000';
+    }else{
+        document.body.classList.remove('dark');
+        document.cookie = 'dark=light;path=/;max-age=2592000';
+    }
+}
+
+// 跨页面通信
+main.channel = function () {
+    if(window.BroadcastChannel){
+        const channel = new BroadcastChannel('zeze_channel');
+        channel.onmessage = function(event) {
+            try {
+                const data = JSON.parse(event.data);
+                main.SwitchDarkMode(data.DarkMode === 'dark');
+            } catch(e) {
+                console.error('广播消息解析失败', e);
+            }
+        };
+        window.addEventListener('beforeunload', () => channel.close());
+    }
+}
+main.channel();
+</script>
+</body>
+</html>
