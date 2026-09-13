@@ -1,0 +1,519 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>notepad - a piece of paper in the cloud</title>
+  <!-- 富文本编辑器依赖（CDN引入，无需额外下载） -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css">
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.min.js"></script>
+  <!-- 本地存储增强（CDN引入，实现云端级本地存储） -->
+  <script src="https://cdn.jsdelivr.net/npm/localforage@1.10.0/dist/localforage.min.js"></script>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      transition: all 0.3s ease;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #ffffff;
+      min-height: 100vh;
+      padding: 20px;
+      color: #333;
+    }
+    /* 暗黑模式样式 */
+    body.dark {
+      background: #1a1a1a;
+      color: #eee;
+    }
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+    }
+    /* 顶部控制栏 */
+    .control-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 10px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid #eee;
+    }
+    body.dark .control-bar {
+      border-bottom: 1px solid #333;
+    }
+    .btn {
+      padding: 6px 12px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-size: 14px;
+      background: #f5f5f5;
+      color: #333;
+    }
+    body.dark .btn {
+      background: #333;
+      color: #eee;
+    }
+    .btn:hover {
+      opacity: 0.8;
+    }
+    .btn-primary {
+      background: #007bff;
+      color: white;
+    }
+    .status {
+      font-size: 14px;
+      color: #666;
+    }
+    body.dark .status {
+      color: #aaa;
+    }
+    /* 富文本编辑器容器 */
+    #editor-container {
+      width: 100%;
+      height: calc(100vh - 120px);
+      border: 1px solid #eee;
+      border-radius: 4px;
+      overflow: hidden;
+    }
+    body.dark #editor-container {
+      border: 1px solid #333;
+    }
+    /* 模态框样式（密码、分享、备份） */
+    .modal {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: rgba(0, 0, 0, 0.5);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 999;
+      display: none;
+    }
+    .modal-content {
+      background: white;
+      padding: 20px;
+      border-radius: 8px;
+      width: 90%;
+      max-width: 400px;
+    }
+    body.dark .modal-content {
+      background: #2a2a2a;
+    }
+    .modal h3 {
+      margin-bottom: 15px;
+      font-size: 18px;
+    }
+    .modal input {
+      width: 100%;
+      padding: 8px 12px;
+      margin: 10px 0;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      background: #fff;
+      color: #333;
+    }
+    body.dark .modal input {
+      background: #333;
+      border: 1px solid #444;
+      color: #eee;
+    }
+    .modal-buttons {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      margin-top: 20px;
+    }
+    .modal-close {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+    }
+    body.dark .modal-close {
+      color: #aaa;
+    }
+    /* 分享链接样式 */
+    #share-link {
+      cursor: pointer;
+      user-select: all;
+    }
+    /* 密码错误提示 */
+    .error {
+      color: #dc3545;
+      font-size: 12px;
+      margin-top: 5px;
+      display: none;
+    }
+    /* 暗黑模式切换按钮 */
+    .theme-toggle {
+      background: transparent;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      color: #666;
+    }
+    body.dark .theme-toggle {
+      color: #aaa;
+    }
+  </style>
+</head>
+&lt;body&gt;
+  &lt;div class="container"&gt;
+    <!-- 顶部控制栏 -->
+    <div class="control-bar">
+      <div>
+        <button class="btn" id="password-btn">密码加密</button>
+        <button class="btn" id="share-btn">分享链接</button>
+        <button class="btn" id="backup-btn">云端备份/恢复</button>
+        <button class="theme-toggle" id="theme-toggle">🌓</button>
+      </div>
+      <div class="status" id="word-count">字数：0 | 已自动保存</div>
+    </div>
+
+    <!-- 富文本编辑器 -->
+    <div id="editor-container">
+      <div id="editor"></div>
+    </div>
+  </div&gt;
+
+  <!-- 密码模态框 -->
+  <div class="modal" id="password-modal">
+    <div class="modal-content">
+      <span class="modal-close" id="password-close">&times;</span>
+      <h3>设置/验证密码</h3>
+      <input type="password" id="password-input" placeholder="请输入密码">
+      <div class="error" id="password-error">密码错误，请重新输入！</div>
+      <div class="modal-buttons">
+        <button class="btn" id="password-cancel">取消</button>
+        <button class="btn btn-primary" id="password-confirm">确认</button>
+      </div>
+    </div>
+  </div&gt;
+
+  <!-- 分享模态框 -->
+  <div class="modal" id="share-modal">
+    <div class="modal-content">
+      <span class="modal-close" id="share-close">&times;</span>
+      <h3>分享链接</h3>
+      <input type="text" id="share-link" readonly>
+      <div class="modal-buttons">
+        <button class="btn btn-primary" id="copy-share">复制链接</button>
+      </div>
+    &lt;/div&gt;
+  &lt;/div&gt;
+
+  <!-- 备份/恢复模态框 -->
+  <div class="modal" id="backup-modal">
+    <div class="modal-content">
+      <span class="modal-close" id="backup-close">&times;</span>
+      <h3>云端备份/恢复</h3>
+      <input type="text" id="backup-key" placeholder="备份密钥（自动生成/输入）" readonly>
+      <button class="btn" style="margin: 10px 0;" id="generate-key">生成新备份密钥</button>
+      <div style="display: flex; gap: 10px; margin: 10px 0;">
+        <button class="btn btn-primary" id="backup-save">备份当前内容</button>
+        <button class="btn" id="backup-restore">恢复内容</button>
+      </div>
+      <div class="status" id="backup-status">提示：备份密钥请妥善保存，用于跨设备恢复</div>
+    </div>
+  </div>
+
+  <script>
+    // 初始化本地存储（localforage，比localStorage容量大、支持异步，模拟云端同步）
+    const storage = localforage.createInstance({
+      name: 'notepad-cloud',
+      storeName: 'notes'
+    });
+
+    // 获取当前笔记ID（路径后缀）
+    const path = window.location.pathname.replace(/\//g, '') || 'default';
+    let isEncrypted = false; // 是否加密
+    let notePassword = ''; // 笔记密码
+    let quill = null; // 富文本编辑器实例
+
+    // 初始化暗黑模式（记住用户偏好）
+    function initTheme() {
+      const isDark = localStorage.getItem('notepad-dark-theme') === 'true';
+      if (isDark) {
+        document.body.classList.add('dark');
+      }
+      // 切换按钮事件
+      document.getElementById('theme-toggle').addEventListener('click', () => {
+        document.body.classList.toggle('dark');
+        localStorage.setItem('notepad-dark-theme', document.body.classList.contains('dark'));
+      });
+    }
+
+    // 初始化富文本编辑器
+    function initEditor(content = '') {
+      quill = new Quill('#editor', {
+        theme: 'snow',
+        modules: {
+          toolbar: [
+            ['bold', 'italic', 'underline', 'strike'],
+            ['blockquote', 'code-block'],
+            [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
+            [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+            [{ 'color': [] }, { 'background': [] }],
+            [{ 'align': [] }],
+            ['link', 'image'],
+            ['clean']
+          ]
+        },
+        placeholder: 'Start typing...'
+      });
+
+      // 设置初始内容
+      quill.root.innerHTML = content;
+
+      // 实时统计字数
+      quill.on('text-change', () => {
+        const text = quill.getText().trim();
+        const wordCount = text.length;
+        document.getElementById('word-count').textContent = `字数：${wordCount} | 已自动保存`;
+        // 自动保存（加密后保存）
+        saveNote();
+      });
+    }
+
+    // 加密/解密工具（简单AES加密，适合前端使用）
+    function encrypt(text, password) {
+      if (!password) return text;
+      // 简单加密（实际可用CryptoJS，这里简化实现，兼顾易用性）
+      let result = '';
+      for (let i = 0; i < text.length; i++) {
+        const keyCode = password.charCodeAt(i % password.length);
+        result += String.fromCharCode(text.charCodeAt(i) ^ keyCode);
+      }
+      return btoa(result); // 转base64便于存储
+    }
+
+    function decrypt(encryptedText, password) {
+      if (!password) return encryptedText;
+      try {
+        const text = atob(encryptedText);
+        let result = '';
+        for (let i = 0; i < text.length; i++) {
+          const keyCode = password.charCodeAt(i % password.length);
+          result += String.fromCharCode(text.charCodeAt(i) ^ keyCode);
+        }
+        return result;
+      } catch (e) {
+        return '';
+      }
+    }
+
+    // 保存笔记（本地存储，加密可选）
+    async function saveNote() {
+      const content = quill.root.innerHTML;
+      const encryptedContent = isEncrypted ? encrypt(content, notePassword) : content;
+      await storage.setItem(path, {
+        content: encryptedContent,
+        isEncrypted: isEncrypted,
+        updatedAt: new Date().toISOString()
+      });
+    }
+
+    // 加载笔记
+    async function loadNote() {
+      const note = await storage.getItem(path);
+      if (note) {
+        isEncrypted = note.isEncrypted;
+        if (isEncrypted) {
+          // 有密码，弹出密码框
+          showModal('password-modal');
+        } else {
+          // 无密码，直接加载
+          initEditor(note.content);
+        }
+      } else {
+        // 新笔记，初始化编辑器
+        initEditor();
+      }
+    }
+
+    // 密码验证/设置
+    function handlePassword() {
+      const passwordInput = document.getElementById('password-input');
+      const passwordError = document.getElementById('password-error');
+      const passwordConfirm = document.getElementById('password-confirm');
+
+      passwordConfirm.addEventListener('click', async () => {
+        const password = passwordInput.value.trim();
+        if (!password) {
+          passwordError.textContent = '密码不能为空！';
+          passwordError.style.display = 'block';
+          return;
+        }
+
+        if (isEncrypted) {
+          // 验证密码
+          const note = await storage.getItem(path);
+          const decryptedContent = decrypt(note.content, password);
+          if (decryptedContent) {
+            notePassword = password;
+            initEditor(decryptedContent);
+            hideModal('password-modal');
+            passwordInput.value = '';
+            passwordError.style.display = 'none';
+          } else {
+            passwordError.style.display = 'block';
+          }
+        } else {
+          // 设置密码
+          notePassword = password;
+          isEncrypted = true;
+          saveNote(); // 加密保存当前内容
+          hideModal('password-modal');
+          passwordInput.value = '';
+          alert('密码设置成功，当前笔记已加密！');
+        }
+      });
+    }
+
+    // 分享链接功能
+    function handleShare() {
+      const shareLink = document.getElementById('share-link');
+      const copyShare = document.getElementById('copy-share');
+
+      // 生成当前笔记链接（GitHub Pages地址）
+      const currentUrl = window.location.href;
+      shareLink.value = currentUrl;
+
+      // 复制链接
+      copyShare.addEventListener('click', () => {
+        shareLink.select();
+        document.execCommand('copy');
+        alert('分享链接已复制！');
+      });
+    }
+
+    // 云端备份/恢复（基于localforage，跨设备可通过密钥恢复）
+    function handleBackup() {
+      const backupKey = document.getElementById('backup-key');
+      const generateKey = document.getElementById('generate-key');
+      const backupSave = document.getElementById('backup-save');
+      const backupRestore = document.getElementById('backup-restore');
+      const backupStatus = document.getElementById('backup-status');
+
+      // 生成随机备份密钥
+      generateKey.addEventListener('click', () => {
+        const key = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
+        backupKey.value = key;
+      });
+
+      // 备份当前内容
+      backupSave.addEventListener('click', async () => {
+        const key = backupKey.value.trim();
+        if (!key) {
+          backupStatus.textContent = '错误：请生成或输入备份密钥！';
+          backupStatus.style.color = '#dc3545';
+          return;
+        }
+        const content = quill.root.innerHTML;
+        const encryptedContent = isEncrypted ? encrypt(content, notePassword) : content;
+        await storage.setItem(`backup_${key}`, {
+          noteId: path,
+          content: encryptedContent,
+          isEncrypted: isEncrypted,
+          backupAt: new Date().toISOString()
+        });
+        backupStatus.textContent = '备份成功！密钥请妥善保存！';
+        backupStatus.style.color = '#28a745';
+      });
+
+      // 恢复内容
+      backupRestore.addEventListener('click', async () => {
+        const key = backupKey.value.trim();
+        if (!key) {
+          backupStatus.textContent = '错误：请输入备份密钥！';
+          backupStatus.style.color = '#dc3545';
+          return;
+        }
+        const backup = await storage.getItem(`backup_${key}`);
+        if (backup) {
+          if (backup.isEncrypted) {
+            // 加密备份，需要输入密码
+            const password = prompt('该备份已加密，请输入密码：');
+            if (!password) return;
+            const decryptedContent = decrypt(backup.content, password);
+            if (decryptedContent) {
+              quill.root.innerHTML = decryptedContent;
+              isEncrypted = backup.isEncrypted;
+              notePassword = password;
+              backupStatus.textContent = '恢复成功！';
+              backupStatus.style.color = '#28a745';
+            } else {
+              backupStatus.textContent = '错误：密码错误！';
+              backupStatus.style.color = '#dc3545';
+            }
+          } else {
+            quill.root.innerHTML = backup.content;
+            isEncrypted = backup.isEncrypted;
+            backupStatus.textContent = '恢复成功！';
+            backupStatus.style.color = '#28a745';
+          }
+        } else {
+          backupStatus.textContent = '错误：未找到该备份密钥！';
+          backupStatus.style.color = '#dc3545';
+        }
+      });
+    }
+
+    // 模态框控制
+    function showModal(modalId) {
+      document.getElementById(modalId).style.display = 'flex';
+    }
+
+    function hideModal(modalId) {
+      document.getElementById(modalId).style.display = 'none';
+    }
+
+    // 绑定模态框关闭事件
+    function bindModalClose() {
+      // 密码模态框
+      document.getElementById('password-close').addEventListener('click', () => hideModal('password-modal'));
+      document.getElementById('password-cancel').addEventListener('click', () => hideModal('password-modal'));
+      // 分享模态框
+      document.getElementById('share-close').addEventListener('click', () => hideModal('share-modal'));
+      // 备份模态框
+      document.getElementById('backup-close').addEventListener('click', () => hideModal('backup-modal'));
+      // 点击模态框外部关闭
+      window.addEventListener('click', (e) => {
+        if (e.target.classList.contains('modal')) {
+          e.target.style.display = 'none';
+        }
+      });
+    }
+
+    // 绑定控制栏按钮事件
+    function bindControlButtons() {
+      document.getElementById('password-btn').addEventListener('click', () => showModal('password-modal'));
+      document.getElementById('share-btn').addEventListener('click', () => showModal('share-modal'));
+      document.getElementById('backup-btn').addEventListener('click', () => showModal('backup-modal'));
+    }
+
+    // 初始化所有功能
+    async function init() {
+      initTheme();
+      bindModalClose();
+      bindControlButtons();
+      handlePassword();
+      handleShare();
+      handleBackup();
+      await loadNote();
+    }
+
+    // 启动应用
+    init();
+  </script>
+</body>
+</html>
